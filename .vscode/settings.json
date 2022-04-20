@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "adc_gen0.h": "c",
+        "timer0a.h": "c",
+        "stdarg.h": "c"
+    }
+}
