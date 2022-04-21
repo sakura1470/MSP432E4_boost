@@ -11,77 +11,95 @@
 #include <pwm_gen1.h>
 #include <buck.h>
 
-extern uint32_t getADCValue[4];
-#define point 96.2
-extern PID_v pid_v;
 
-extern float set;
+extern uint16_t getADCValue[4];
 
-
-// error state size
-#define ERROR_STATE_SIZE        3
-
-#define CUR_STATE               0
-#define LAST_STATE              1
-#define LAST_LAST_STATE         2
-
-typedef struct tagPIController {
-    // params
-    float kp, ki;
-    // error state
-    float err[ERROR_STATE_SIZE];
-} PIController;
+#define SCALE_RATIO     93.670f
 
 float g_err, g_out, g_adc_in;
 
-//! Global PI
-static PIController pi_ctl = { 0 };
+// pid
+Buck_PID pid;
 
-//
-extern void buck_pi_init(float kp, float ki)
+extern void Buck_PID_Construct(Buck_PID *pid, float kp, float ki, float kd, float kc)
 {
-    pi_ctl.kp = kp;
-    pi_ctl.ki = ki;
+    pid->kp = kp;
+    pid->ki = ki;
+    pid->kd = kd;
+    pid->kc = kc;
+    //
+    pid->clampMax = INT16_MAX;
+    pid->clampMin = INT16_MIN;
+    //
+    pid->_sum = 0;
+    pid->_sat = 0;
+    pid->_saterr = 0;
+}
+// 设置clamp
+extern void Buck_PID_SetClamp(Buck_PID *pid, float min, float max)
+{
+    pid->clampMin = min;
+    pid->clampMax = max;
+}
+// 传递
+// err: 当前误差
+extern float Buck_PI_Transfer(Buck_PID *pid, float err)
+{
+    float output = 0;
+    // 饱和前输出 = 比例输出 + 上次积分值
+    pid->_sat = pid->kp * err + pid->_sum;
+    // 饱和限制
+    if (pid->_sat > pid->clampMax)
+    {
+        output = pid->clampMax;
+    }
+    else if (pid->_sat < pid->clampMin)
+    {
+        output = pid->clampMin;
+    }
+    else {
+        output = pid->_sat;
+    }
+    // 计算饱和误差
+    float satErr = output - pid->_sat;
+    // 带饱和校正的积分输出
+    pid->_sum += pid->ki * err + pid->kc * satErr;
+    // 积分结果clamp
+    if (pid->_sum > pid->clampMax)
+    {
+        pid->_sum = pid->clampMax;
+    }
+    else if (pid->_sum < pid->clampMin)
+    {
+        pid->_sum = pid->clampMin;
+    }
+    return output;
+}
+//pid初始化
+extern void buck_control_init(void)
+{
+    Buck_PID_Construct(&pid, 0.03, 0.002, 0, 0);
+    Buck_PID_SetClamp(&pid, 0.2, 0.8);
 }
 
-//! pi transfer
-static float pi_transfer(float err)
-{
-    float inc_i = err - 2 * pi_ctl.err[LAST_STATE] + pi_ctl.err[LAST_LAST_STATE];
-    // update state
-    pi_ctl.err[LAST_LAST_STATE] = pi_ctl.err[LAST_STATE];
-    pi_ctl.err[LAST_STATE] = pi_ctl.err[CUR_STATE];
-    pi_ctl.err[CUR_STATE] = err;
-    // forward transfer
-    float cur_out = pi_ctl.kp * err + inc_i;
-    // clamp
-    if (cur_out < 0.2f)
-    {
-        cur_out = 0.2f;
-    }
-    else if (cur_out > 0.8f)
-    {
-        cur_out = 0.8;
-    }
-    // TODO clamp error
-    return cur_out;
-}
 
 extern void buck_update(void)
 {
-    float v_ref = 8.0f;
+    float v_ref = 30.0f;
+    static float u_filter = 0;
     //
-    // float u_in = getADCValue[0] / 96.2f;
-    static float u_out_filter = 0;
-    float u_out = getADCValue[1] / 96.2f;
-    u_out = (u_out_filter * 3.0f + u_out) / 4.0f;
+    float u_out  = getADCValue[1] / SCALE_RATIO;
+    u_filter = (u_filter * 7 + u_out ) * 0.125;
+    u_out = u_filter;
+    //
     g_adc_in = u_out;
     //
-    float err = u_out - v_ref;
+    float err = v_ref - u_out;
     g_err = err;
     //
-    float timer_d = pi_transfer(err);
+    float timer_d = Buck_PI_Transfer(&pid, err);
     g_out = timer_d;
     //
     PWM0init(timer_d);
 }
+

@@ -8,21 +8,27 @@
 #ifndef BUCK_BUCK_H_
 #define BUCK_BUCK_H_
 
-typedef struct PID
+typedef struct tagBuck_PID
 {
-    float Kp;
-    float Ki;
-    float Kc;
+    float kp, ki, kd, kc;
     float clampMin, clampMax;
-    float _sum , _sat ,_saterr;
-} PID_v;
- 
-/*! PID Controller Init
- *
- * @param[in]   kp: Kp
- * @param[in]   ki: Ki
-*/
-extern void buck_pi_init(float kp, float ki);
+// private:
+    float _sum;
+    float _sat;
+    float _saterr;
+} Buck_PID;
+// 构造
+// kp: 比例系数
+// ki: 积分系数
+// kd: 微分系数
+extern void Buck_PID_Construct(Buck_PID *pid, float kp, float ki, float kd, float kc);
+// 设置clamp
+extern void Buck_PID_SetClamp(Buck_PID *pid, float min, float max);
+// 传递(PI)
+// err: 当前误差
+extern float Buck_PI_Transfer(Buck_PID *pid, float err);
+
+extern void buck_control_init(void);
 
 extern void buck_update(void);
 

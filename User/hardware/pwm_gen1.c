@@ -6,8 +6,10 @@
  *      OUT:PF2 PF3
  */
 #include<main.h>
-#define pwm 100000
-#define SystemClock 120000000
+
+#define pwm 100000              //PWM输出频率
+
+#define SystemClock 120000000   //时钟频率
 
 
 void PWM0init(float pwm_width)

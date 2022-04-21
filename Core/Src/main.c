@@ -54,11 +54,16 @@
 #include <timer0A.h>
 #include <stdarg.h>
 
-uint32_t getSystemClock;
-extern uint32_t getADCValue[4];
+uint16_t getSystemClock;                      //时钟频率
 
-volatile bool bgetConvStatus = false;;
+extern uint16_t getADCValue[4];               //ADC采样值
 
+volatile bool bgetConvStatus = false;;        //ADC采样值转换成功flag
+
+char flag0 = 1;
+char flag1 = 1;
+
+//设置UART参数
 void ConfigureUART(uint32_t systemClock)
 {
     /* Enable the clock to GPIO port A and UART 0 */
@@ -72,8 +77,6 @@ void ConfigureUART(uint32_t systemClock)
     {
 
     }
-
-
     /* Configure the GPIO Port A for UART 0 */
     MAP_GPIOPinConfigure(GPIO_PA0_U0RX);
     MAP_GPIOPinConfigure(GPIO_PA1_U0TX);
@@ -85,35 +88,59 @@ void ConfigureUART(uint32_t systemClock)
 
 void ADC0SS2_IRQHandler(void)
 {
-      uint32_t getIntStatus;
-
+    uint32_t getIntStatus;
     /* Get the interrupt status from the ADC */
-    getIntStatus = MAP_ADCIntStatus(ADC0_BASE, 2, true);
+    getIntStatus = MAP_ADCIntStatusEx(ADC0_BASE, true);
 
     /* If the interrupt status for Sequencer-2 is set the
      * clear the status and read the data */
-    if(getIntStatus == 0x4)
+    if((getIntStatus & ADC_INT_DMA_SS2) == ADC_INT_DMA_SS2)
     {
         /* Clear the ADC interrupt flag. */
-        MAP_ADCIntClear(ADC0_BASE, 2);
+        MAP_ADCIntClearEx(ADC0_BASE, ADC_INT_DMA_SS2);
+        /* Reconfigure the channel control structure and enable the channel */
+        MAP_uDMAChannelTransferSet(UDMA_CH16_ADC0_2 | UDMA_PRI_SELECT,
+                                    UDMA_MODE_BASIC,
+                                    (void *)&ADC0->SSFIFO2, (void *)&getADCValue,
+                                    sizeof(getADCValue)/2);
 
-        /* Read ADC Value. */
-        MAP_ADCSequenceDataGet(ADC0_BASE, 2, getADCValue);
+        MAP_uDMAChannelEnable(UDMA_CH16_ADC0_2);
+        //GPION_1写入值
+        MAP_GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_0,flag0);
+        //flag0取反
+        flag0 = ~flag0;
 
+        /* Set conversion flag to true */
         bgetConvStatus = true;
     }
 }
 
-void main(void)
+void TIMER0A_IRQHandler(void)
+{
+    MAP_TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+    buck_update();
+    MAP_GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_1,flag1);
+    flag1 = ~flag1;
+}
+
+int main(void)
  {
     getSystemClock = MAP_SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
                      SYSCTL_OSC_MAIN |
                      SYSCTL_USE_PLL |
                      SYSCTL_CFG_VCO_480), 120000000);
+
+    FPUEnable();
+    FPULazyStackingEnable();
+    //
     ConfigureUART(getSystemClock);
+    //
     adc_init();
+    //
     timer1_init(getSystemClock);
-    buck_pi_init(0.1, 0.1);
+    //
+    buck_control_init();
+    //
     while(1)
     {
         while(!bgetConvStatus);

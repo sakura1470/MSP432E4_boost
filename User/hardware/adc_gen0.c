@@ -1,8 +1,13 @@
+
+//******************
+//配置ADC0 四通道 
+//IN：PE3 PE2 PE1 PE0
+//OUT: getADCValue[4]
+//由PWM1触发中断采样
+//******************
+
+
 #include<main.h>
-
-uint32_t getADCValue[4];
-
-extern uint32_t getSystemClock;
 
 /* The control table used by the uDMA controller.  This table must be aligned
  * to a 1024 byte boundary. */
@@ -16,6 +21,7 @@ uint8_t pui8ControlTable[1024];
 uint8_t pui8ControlTable[1024] __attribute__ ((aligned(1024)));
 #endif
 
+uint16_t getADCValue[4];
 
 void adc_init(void)
 {
@@ -59,4 +65,48 @@ void adc_init(void)
 
         /* Enable the Interrupt generation from the ADC-0 Sequencer */
         MAP_IntEnable(INT_ADC0SS2);
+                /* Enable the DMA and Configure Channel for TIMER0A for Ping Pong mode of
+         * transfer */
+        MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_UDMA);
+        while(!(SysCtlPeripheralReady(SYSCTL_PERIPH_UDMA)))
+        {
+        }
+
+        MAP_uDMAEnable();
+
+        /* Point at the control table to use for channel control structures. */
+        MAP_uDMAControlBaseSet(pui8ControlTable);
+
+        /* Map the ADC0 Sequencer 2 DMA channel */
+        MAP_uDMAChannelAssign(UDMA_CH16_ADC0_2);
+
+        /* Put the attributes in a known state for the uDMA ADC0 Sequencer 2
+         * channel. These should already be disabled by default. */
+        MAP_uDMAChannelAttributeDisable(UDMA_CH16_ADC0_2,
+                                        UDMA_ATTR_ALTSELECT | UDMA_ATTR_USEBURST |
+                                        UDMA_ATTR_HIGH_PRIORITY |
+                                        UDMA_ATTR_REQMASK);
+
+        /* Configure the control parameters for the primary control structure for
+         * the ADC0 Sequencer 2 channel. The primary control structure is used for
+         * copying the data from ADC0 Sequencer 2 FIFO to srcBuffer. The transfer
+         * data size is 16 bits and the source address is not incremented while
+         * the destination address is incremented at 16-bit boundary.
+         */
+        MAP_uDMAChannelControlSet(UDMA_CH16_ADC0_2 | UDMA_PRI_SELECT,
+                                  UDMA_SIZE_16 | UDMA_SRC_INC_NONE | UDMA_DST_INC_16 |
+                                  UDMA_ARB_4);
+
+        /* Set up the transfer parameters for the ADC0 Sequencer 2 primary control
+         * structure. The mode is Basic mode so it will run to completion. */
+        MAP_uDMAChannelTransferSet(UDMA_CH16_ADC0_2 | UDMA_PRI_SELECT,
+                                   UDMA_MODE_BASIC,
+                                   (void *)&ADC0->SSFIFO2, (void *)&getADCValue,
+                                   sizeof(getADCValue)/2);
+
+        /* The uDMA ADC0 Sequencer 2 channel is primed to start a transfer. As
+         * soon as the channel is enabled and the Timer will issue an ADC trigger,
+         * the ADC will perform the conversion and send a DMA Request. The data
+         * transfers will begin. */
+        MAP_uDMAChannelEnable(UDMA_CH16_ADC0_2);
 }
