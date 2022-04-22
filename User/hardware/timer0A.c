@@ -7,7 +7,7 @@
 # include <main.h>
 
 
-void timer_init(uint32_t getSystemClock)
+void timer1_init(uint32_t getSystemClock)
 {
 
     MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);

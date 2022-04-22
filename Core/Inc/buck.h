@@ -10,26 +10,26 @@
 
 typedef struct tagBuck_PID
 {
-    float kp, ki, kd, kc;
-    float clampMin, clampMax;
+    uint16_t kp, ki, kd, kc;
+    uint16_t clampMin, clampMax;
 // private:
-    float _sum;
-    float _sat;
-    float _saterr;
+    uint16_t _sum;
+    uint16_t _sat;
+    uint16_t _saterr;
 } Buck_PID;
 // 构造
 // kp: 比例系数
 // ki: 积分系数
 // kd: 微分系数
-extern void Buck_PID_Construct(Buck_PID *pid, float kp, float ki, float kd, float kc);
+extern void Buck_PID_Construct(Buck_PID *pid, uint16_t kp, uint16_t ki, uint16_t kd, uint16_t kc);
 // 设置clamp
-extern void Buck_PID_SetClamp(Buck_PID *pid, float min, float max);
+extern void Buck_PID_SetClamp(Buck_PID *pid, uint16_t min, uint16_t max);
 // 传递(PI)
 // err: 当前误差
-extern float Buck_PI_Transfer(Buck_PID *pid, float err);
+extern uint16_t Buck_PI_Transfer(Buck_PID *pid, uint16_t err);
 
 extern void buck_control_init(void);
 
-extern void buck_update(void);
+extern void buck_update(float v_set);
 
 #endif /* BUCK_BUCK_H_ */

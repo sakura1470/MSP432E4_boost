@@ -118,7 +118,7 @@ void ADC0SS2_IRQHandler(void)
 void TIMER0A_IRQHandler(void)
 {
     MAP_TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
-    buck_update();
+    buck_update(30.0f);
     MAP_GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_1,flag1);
     flag1 = ~flag1;
 }
