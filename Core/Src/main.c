@@ -137,7 +137,7 @@ int main(void)
     //
     adc_init();
     //
-    timer1_init(getSystemClock);
+    timer1_init(getSystemClock, 100);
     //
     buck_control_init();
     //

@@ -9,7 +9,7 @@
 #define TIMER0A_H_
 
 
-extern void timer1_init(uint32_t getSystemClock);
+extern void timer1_init(uint32_t getSystemClock, uint16_t rate);
 
 
 #endif /* TIMER0A_H_ */

@@ -2494,7 +2494,7 @@ LOAD c:/program files (x86)/gnu arm embedded toolchain/10 2021.10/bin/../lib/gcc
  *(.stack)
                 0x20040000                __StackTop = (ORIGIN (REGION_STACK) + LENGTH (REGION_STACK))
                 0x20040000                PROVIDE (__stack = __StackTop)
-OUTPUT(build/MSP432E4_BUCK.elf elf32-littlearm)
+OUTPUT(build/MSP432E4_BOOST.elf elf32-littlearm)
 LOAD linker stubs
 
 .ARM.attributes
